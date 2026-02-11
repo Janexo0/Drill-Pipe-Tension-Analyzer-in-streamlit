@@ -65,24 +65,25 @@ if calc_button or st.session_state.calculated:
 
     torque_range = np.linspace(0, limit_display, 200)
     
-    t_max_list = []
-    t_sf_list = []
-    
-    for q in torque_range:
-        # Convert params to base units (ft-lb)
-        q_ftlb = q * 1000 if torque_unit == "kft-lb" else q * 737.56
-        
-        # calculating max tension
-        tension_lb = calc.calculate_max_tension(area_in2, yield_psi, q_ftlb, selected_size, inertia_in4)
-        
-        # conversion to output unit
-        if tension_unit == "klb":
-            val = tension_lb / 1000
-        else: # mT
-            val = tension_lb * 0.00045359
-            
-        t_max_list.append(val)
-        t_sf_list.append(val * (1 - sf_percent/100))
+    q_ftlb = torque_range * (1000 if torque_unit == "kft-lb" else 737.56)
+
+    # Single vectorized function call
+    tension_lb = calc.calculate_max_tension(
+        area_in2,
+        yield_psi,
+        q_ftlb,
+        selected_size,
+        inertia_in4
+    )
+
+    # Convert output units (vectorized)
+    if tension_unit == "klb":
+        t_max = tension_lb / 1000
+    else:
+        t_max = tension_lb * 0.00045359
+
+    # Apply safety factor (vectorized)
+    t_safe = calc.apply_safety_factor(sf_percent, t_max)
 
     st.success("Calculations up to date")
 
@@ -95,8 +96,8 @@ if calc_button or st.session_state.calculated:
     # plot
     
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(torque_range, t_max_list, 'r-', label="Max Allowable Tension", linewidth=2)
-    ax.plot(torque_range, t_sf_list, 'g--', label=f"Safe Tension ({sf_percent}%)", linewidth=2)
+    ax.plot(torque_range, t_max, 'r-', label="Max Allowable Tension", linewidth=2)
+    ax.plot(torque_range, t_safe, 'g--', label=f"Safe Tension ({sf_percent}%)", linewidth=2)
     
     ax.set_title(f"Torque-Tension Limit for {pipe_label} {selected_weight} lb/ft", fontsize=12)
     ax.set_xlabel(f"Torque [{torque_unit}]")
